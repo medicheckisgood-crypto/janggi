@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>한국 전통 장기</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    body {
+      margin: 0;
+      padding: 10px 5px;
+      background-color: #2b1d0c;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      touch-action: manipulation;
+    }
+    header {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #f7d288;
+      letter-spacing: 1px;
+    }
+    .status-panel {
+      width: 100%;
+      max-width: 440px;
+      background: #3e2714;
+      border: 1px solid #6b4423;
+      border-radius: 8px;
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+    }
+    .turn-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+    }
+    .turn-badge {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .turn-badge.cho {
+      background: #1e88e5;
+      box-shadow: 0 0 8px #42a5f5;
+    }
+    .turn-badge.han {
+      background: #e53935;
+      box-shadow: 0 0 8px #ef5350;
+    }
+    .board-container {
+      position: relative;
+      width: 100%;
+      max-width: 420px;
+      aspect-ratio: 9 / 10;
+      background: #e09f58;
+      background-image: radial-gradient(circle at 50% 50%, #f4bc7c 0%, #cf8c42 100%);
+      border: 3px solid #5a300a;
+      border-radius: 6px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+      touch-action: none;
+    }
+    canvas#boardCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: none;
+    }
+    #piecesLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+    }
+    .piece {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 50%;
+      box-shadow: 1px 3px 6px rgba(0, 0, 0, 0.55), inset 0 2px 2px rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      font-family: "Batang", "Gungsuh", "궁서", serif;
+      font-weight: 900;
+      transition: transform 0.08s ease;
+      z-index: 5;
+    }
+    .piece:active {
+      transform: translate(-50%, -50%) scale(1.12);
+    }
+    .piece.cho {
+      background: radial-gradient(circle at 35% 30%, #455a64, #1c272c);
+      border: 2px solid #607d8b;
+      color: #64b5f6;
+      text-shadow: 0 0 3px rgba(100, 181, 246, 0.8);
+    }
+    .piece.han {
+      background: radial-gradient(circle at 35% 30%, #544439, #2b180d);
+      border: 2px solid #8d6e63;
+      color: #ef5350;
+      text-shadow: 0 0 3px rgba(239, 83, 80, 0.8);
+    }
+    .piece.selected {
+      border: 2.5px solid #ffeb3b !important;
+      box-shadow: 0 0 12px #ffeb3b, 1px 3px 6px rgba(0, 0, 0, 0.6) !important;
+      z-index: 10;
+    }
+    .piece.king { width: 9.6%; height: 9.6%; font-size: 1.35rem; }
+    .piece.major { width: 8.8%; height: 8.8%; font-size: 1.15rem; }
+    .piece.minor { width: 7.8%; height: 7.8%; font-size: 0.95rem; }
+    .move-hint {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      z-index: 8;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .move-hint.empty {
+      width: 22%;
+      height: 22%;
+      background: radial-gradient(circle, rgba(30, 136, 229, 0.75) 25%, transparent 26%);
+    }
+    .move-hint.capture {
+      width: 9.2%;
+      height: 9.2%;
+      border: 3px solid #ff1744;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.8; }
+      100% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+    }
+    .controls {
+      width: 100%;
+      max-width: 440px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-top: 10px;
+    }
+    button, select {
+      background: #4a2c11;
+      color: #fcefdc;
+      border: 1px solid #7c4d28;
+      padding: 10px 4px;
+      font-size: 0.88rem;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    button:active {
+      background: #6a3e19;
+      transform: translateY(1px);
+    }
+    .mode-select {
+      width: 100%;
+      background: #3e2714;
+      color: #f7d288;
+      border: 1px solid #6b4423;
+      padding: 6px 8px;
+      border-radius: 6px;
+      margin-top: 8px;
+      max-width: 440px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.88rem;
+    }
+    .mode-select select {
+      padding: 4px 8px;
+      background: #231407;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>전통 장기 (將棋)</h1>
+    <div id="gameMsg" style="font-size: 0.9rem; color: #ffca28; font-weight: bold;">대국 시작</div>
+  </header>
+
+  <div class="status-panel">
+    <div class="turn-indicator">
+      <span class="turn-badge cho" id="turnBadge"></span>
+      <span id="turnText">초(楚) 차례 (선수)</span>
+    </div>
+    <div id="checkAlert" style="color: #ff5252; font-weight: bold; display: none;">[장군!]</div>
+  </div>
+
+  <div class="board-container" id="boardContainer">
+    <canvas id="boardCanvas"></canvas>
+    <div id="piecesLayer"></div>
+  </div>
+
+  <div class="controls">
+    <button onclick="game.undo()">한수 물리기</button>
+    <button onclick="game.passTurn()">한수 쉼</button>
+    <button onclick="game.reset()">다시 시작</button>
+    <button onclick="game.toggleAudio()" id="audioBtn">소리: 켬</button>
+  </div>
+
+  <div class="mode-select">
+    <label for="aiMode">대국 상대:</label>
+    <select id="aiMode" onchange="game.changeOpponent(this.value)">
+      <option value="ai">인공지능(AI)과 대국</option>
+      <option value="human">두 사람이 함께 두기</option>
+    </select>
+  </div>
+
+  <script>
+    const ROWS = 10;
+    const COLS = 9;
+
+    const SOUND = {
+      ctx: null,
+      enabled: true,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      },
+      playMove() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.7, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+      },
+      playAlert() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+        osc.frequency.setValueAtTime(660, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.25);
+      }
+    };
+
+    const PIECE_NAMES = {
+      CHO: { K: '楚', R: '車', C: '包', H: '馬', E: '象', A: '士', P: '卒' },
+      HAN: { K: '漢', R: '車', C: '包', H: '馬', E: '象', A: '士', P: '兵' }
+    };
+
+    class JanggiGame {
+      constructor() {
+        this.board = Array(ROWS).fill(null).map(() => Array(COLS).fill(null));
+        this.turn = 'CHO';
+        this.selected = null;
+        this.validMoves = [];
+        this.history = [];
+        this.opponent = 'ai';
+        this.isAiThinking = false;
+
+        this.initDOM();
+        this.reset();
+        window.addEventListener('resize', () => this.drawBoard());
+      }
+
+      initDOM() {
+        this.canvas = document.getElementById('boardCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.piecesLayer = document.getElementById('piecesLayer');
+        this.turnBadge = document.getElementById('turnBadge');
+        this.turnText = document.getElementById('turnText');
+        this.gameMsg = document.getElementById('gameMsg');
+        this.checkAlert = document.getElementById('checkAlert');
+
+        this.piecesLayer.addEventListener('click', (e) => {
+          const target = e.target.closest('.piece, .move-hint');
+          if (!target) return;
+          const r = parseInt(target.dataset.r, 10);
+          const c = parseInt(target.dataset.c, 10);
+          this.handleCellClick(r, c);
+        });
+      }
+
+      reset() {
+        this.board = Array(ROWS).fill(null).map(() => Array(COLS).fill(null));
+        this.turn = 'CHO';
+        this.selected = null;
+        this.validMoves = [];
+        this.history = [];
+        this.isAiThinking = false;
+        this.gameMsg.innerText = "초(楚) 선수로 시작합니다.";
+        this.checkAlert.style.display = 'none';
+
+        this.setupDefault();
+        this.updateUI();
+        this.drawBoard();
+      }
+
+      setupDefault() {
+        const place = (r, c, side, type) => {
+          this.board[r][c] = { side, type };
+        };
+
+        // 한(漢) 진영
+        place(0, 0, 'HAN', 'R');
+        place(0, 1, 'HAN', 'E');
+        place(0, 2, 'HAN', 'H');
+        place(0, 3, 'HAN', 'A');
+        place(0, 5, 'HAN', 'A');
+        place(0, 6, 'HAN', 'H');
+        place(0, 7, 'HAN', 'E');
+        place(0, 8, 'HAN', 'R');
+        place(1, 4, 'HAN', 'K');
+        place(2, 1, 'HAN', 'C');
+        place(2, 7, 'HAN', 'C');
+        place(3, 0, 'HAN', 'P');
+        place(3, 2, 'HAN', 'P');
+        place(3, 4, 'HAN', 'P');
+        place(3, 6, 'HAN', 'P');
+        place(3, 8, 'HAN', 'P');
+
+        // 초(楚) 진영
+        place(9, 0, 'CHO', 'R');
+        place(9, 1, 'CHO', 'E');
+        place(9, 2, 'CHO', 'H');
+        place(9, 3, 'CHO', 'A');
+        place(9, 5, 'CHO', 'A');
+        place(9, 6, 'CHO', 'H');
+        place(9, 7, 'CHO', 'E');
+        place(9, 8, 'CHO', 'R');
+        place(8, 4, 'CHO', 'K');
+        place(7, 1, 'CHO', 'C');
+        place(7, 7, 'CHO', 'C');
+        place(6, 0, 'CHO', 'P');
+        place(6, 2, 'CHO', 'P');
+        place(6, 4, 'CHO', 'P');
+        place(6, 6, 'CHO', 'P');
+        place(6, 8, 'CHO', 'P');
+      }
+
+      drawBoard() {
+        const container = document.getElementById('boardContainer');
+        const rect = container.getBoundingClientRect();
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
+
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, rect.width, rect.height);
+
+        const padX = rect.width / (COLS + 1);
+        const padY = rect.height / (ROWS + 1);
+        const stepX = (rect.width - 2 * padX) / (COLS - 1);
+        const stepY = (rect.height - 2 * padY) / (ROWS - 1);
+
+        this.layout = { padX, padY, stepX, stepY };
+
+        ctx.strokeStyle = '#42210b';
+        ctx.lineWidth = 1.8;
+
+        for (let r = 0; r < ROWS; r++) {
+          ctx.beginPath();
+          ctx.moveTo(padX, padY + r * stepY);
+          ctx.lineTo(padX + (COLS - 1) * stepX, padY + r * stepY);
+          ctx.stroke();
+        }
+
+        for (let c = 0; c < COLS; c++) {
+          ctx.beginPath();
+          ctx.moveTo(padX + c * stepX, padY);
+          ctx.lineTo(padX + c * stepX, padY + (ROWS - 1) * stepY);
+          ctx.stroke();
+        }
+
+        const drawDiag = (r1, c1, r2, c2) => {
+          ctx.beginPath();
+          ctx.moveTo(padX + c1 * stepX, padY + r1 * stepY);
+          ctx.lineTo(padX + c2 * stepX, padY + r2 * stepY);
+          ctx.stroke();
+        };
+
+        // 궁성 대각선
+        drawDiag(0, 3, 2, 5);
+        drawDiag(0, 5, 2, 3);
+        drawDiag(7, 3, 9, 5);
+        drawDiag(7, 5, 9, 3);
+      }
+
+      getCoords(r, c) {
+        return {
+          top: `${((r + 1) / (ROWS + 1)) * 100}%`,
+          left: `${((c + 1) / (COLS + 1)) * 100}%`
+        };
+      }
+
+      render() {
+        this.piecesLayer.innerHTML = '';
+
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const piece = this.board[r][c];
+            if (piece) {
+              const el = document.createElement('div');
+              const isSelected = this.selected && this.selected.r === r && this.selected.c === c;
+              const sideClass = piece.side.toLowerCase();
+              let sizeClass = 'major';
+              if (piece.type === 'K') sizeClass = 'king';
+              else if (piece.type === 'A' || piece.type === 'P') sizeClass = 'minor';
+
+              el.className = `piece ${sideClass} ${sizeClass} ${isSelected ? 'selected' : ''}`;
+              el.dataset.r = r;
+              el.dataset.c = c;
+              const pos = this.getCoords(r, c);
+              el.style.top = pos.top;
+              el.style.left = pos.left;
+              el.innerText = PIECE_NAMES[piece.side][piece.type];
+              this.piecesLayer.appendChild(el);
+            }
+          }
+        }
+
+        this.validMoves.forEach(mv => {
+          const hint = document.createElement('div');
+          const isCapture = this.board[mv.r][mv.c] !== null;
+          hint.className = `move-hint ${isCapture ? 'capture' : 'empty'}`;
+          hint.dataset.r = mv.r;
+          hint.dataset.c = mv.c;
+          const pos = this.getCoords(mv.r, mv.c);
+          hint.style.top = pos.top;
+          hint.style.left = pos.left;
+          this.piecesLayer.appendChild(hint);
+        });
+      }
+
+      updateUI() {
+        if (this.turn === 'CHO') {
+          this.turnBadge.className = 'turn-badge cho';
+          this.turnText.innerText = '초(楚) 차례';
+        } else {
+          this.turnBadge.className = 'turn-badge han';
+          this.turnText.innerText = '한(漢) 차례 (AI)';
+        }
+        this.render();
+      }
+
+      handleCellClick(r, c) {
+        if (this.isAiThinking) return;
+
+        const piece = this.board[r][c];
+
+        if (this.selected) {
+          const move = this.validMoves.find(m => m.r === r && m.c === c);
+          if (move) {
+            this.executeMove(this.selected.r, this.selected.c, r, c);
+            this.selected = null;
+            this.validMoves = [];
+            this.updateUI();
+            this.checkPostMove();
+            return;
+          }
+        }
+
+        if (piece && piece.side === this.turn) {
+          if (this.opponent === 'ai' && this.turn === 'HAN') return;
+          this.selected = { r, c };
+          this.validMoves = this.getMoves(r, c, this.board);
+          this.render();
+        } else {
+          this.selected = null;
+          this.validMoves = [];
+          this.render();
+        }
+      }
+
+      executeMove(fr, fc, tr, tc) {
+        this.saveState();
+        const p = this.board[fr][fc];
+        const captured = this.board[tr][tc];
+        this.board[tr][tc] = p;
+        this.board[fr][fc] = null;
+
+        SOUND.playMove();
+
+        if (captured && captured.type === 'K') {
+          this.gameMsg.innerText = `${p.side === 'CHO' ? '초(楚)' : '한(漢)'} 승리!`;
+          alert(`${p.side === 'CHO' ? '초(楚)' : '한(漢)'}이 승리하였습니다!`);
+          return;
+        }
+
+        this.turn = this.turn === 'CHO' ? 'HAN' : 'CHO';
+      }
+
+      checkPostMove() {
+        const inCheck = this.isKingInCheck(this.turn, this.board);
+        if (inCheck) {
+          this.checkAlert.style.display = 'inline';
+          this.gameMsg.innerText = '장군!';
+          SOUND.playAlert();
+        } else {
+          this.checkAlert.style.display = 'none';
+          this.gameMsg.innerText = '대국 진행 중';
+        }
+
+        if (this.opponent === 'ai' && this.turn === 'HAN') {
+          this.triggerAi();
+        }
+      }
+
+      triggerAi() {
+        this.isAiThinking = true;
+        this.gameMsg.innerText = "한(AI) 수 고민 중...";
+
+        setTimeout(() => {
+          this.makeAiMove();
+          this.isAiThinking = false;
+          this.updateUI();
+          this.checkPostMove();
+        }, 350);
+      }
+
+      makeAiMove() {
+        const moves = [];
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const p = this.board[r][c];
+            if (p && p.side === 'HAN') {
+              const list = this.getMoves(r, c, this.board);
+              list.forEach(m => moves.push({ fr: r, fc: c, tr: m.r, tc: m.c }));
+            }
+          }
+        }
+
+        if (moves.length === 0) {
+          this.turn = 'CHO';
+          this.gameMsg.innerText = 'AI가 둘 곳이 없어 한수 쉽니다.';
+          return;
+        }
+
+        const scores = { K: 1000, R: 13, C: 7, H: 5, E: 3, P: 2, A: 3 };
+        let bestScore = -99999;
+        let bestMoves = [];
+
+        for (const mv of moves) {
+          let score = 0;
+          const target = this.board[mv.tr][mv.tc];
+          if (target) score += (scores[target.type] || 1) * 10;
+          score += (mv.tr * 0.1);
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestMoves = [mv];
+          } else if (score === bestScore) {
+            bestMoves.push(mv);
+          }
+        }
+
+        const chosen = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        this.executeMove(chosen.fr, chosen.fc, chosen.tr, chosen.tc);
+      }
+
+      inPalace(r, c, side) {
+        if (c < 3 || c > 5) return false;
+        if (side === 'HAN' || side === 'ALL_HAN') return r >= 0 && r <= 2;
+        if (side === 'CHO' || side === 'ALL_CHO') return r >= 7 && r <= 9;
+        return (r >= 0 && r <= 2) || (r >= 7 && r <= 9);
+      }
+
+      getMoves(r, c, board) {
+        const p = board[r][c];
+        if (!p) return [];
+        const moves = [];
+        const add = (nr, nc) => {
+          if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) return false;
+          const t = board[nr][nc];
+          if (!t) {
+            moves.push({ r: nr, c: nc });
+            return true;
+          }
+          if (t.side !== p.side) {
+            moves.push({ r: nr, c: nc });
+          }
+          return false;
+        };
+
+        const inFort = this.inPalace(r, c);
+
+        switch (p.type) {
+          case 'P': { // 졸/병
+            const fwd = p.side === 'CHO' ? -1 : 1;
+            add(r + fwd, c);
+            add(r, c - 1);
+            add(r, c + 1);
+
+            // 궁성 대각 이동
+            if (inFort) {
+              if (p.side === 'CHO' && r === 8 && c === 4) { add(7, 3); add(7, 5); }
+              else if (p.side === 'CHO' && (r === 9 && (c === 3 || c === 5))) { add(8, 4); }
+              else if (p.side === 'HAN' && r === 1 && c === 4) { add(2, 3); add(2, 5); }
+              else if (p.side === 'HAN' && (r === 0 && (c === 3 || c === 5))) { add(1, 4); }
+            }
+            break;
+          }
+          case 'R': { // 차
+            const dirs = [[1,0], [-1,0], [0,1], [0,-1]];
+            for (const [dr, dc] of dirs) {
+              let nr = r + dr, nc = c + dc;
+              while (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                if (!add(nr, nc)) break;
+                nr += dr; nc += dc;
+              }
+            }
+            // 궁성 대각선
+            if ((r === 0 && c === 3) || (r === 2 && c === 5)) {
+              if (!board[1][4] || board[1][4].side !== p.side) moves.push({r:1, c:4});
+              if (!board[1][4]) {
+                const tr = r === 0 ? 2 : 0, tc = c === 3 ? 5 : 3;
+                if (!board[tr][tc] || board[tr][tc].side !== p.side) moves.push({r:tr, c:tc});
+              }
+            }
+            if ((r === 0 && c === 5) || (r === 2 && c === 3)) {
+              if (!board[1][4] || board[1][4].side !== p.side) moves.push({r:1, c:4});
+              if (!board[1][4]) {
+                const tr = r === 0 ? 2 : 0, tc = c === 5 ? 3 : 5;
+                if (!board[tr][tc] || board[tr][tc].side !== p.side) moves.push({r:tr, c:tc});
+              }
+            }
+            if ((r === 7 && c === 3) || (r === 9 && c === 5)) {
+              if (!board[8][4] || board[8][4].side !== p.side) moves.push({r:8, c:4});
+              if (!board[8][4]) {
+                const tr = r === 7 ? 9 : 7, tc = c === 3 ? 5 : 3;
+                if (!board[tr][tc] || board[tr][tc].side !== p.side) moves.push({r:tr, c:tc});
+              }
+            }
+            if ((r === 7 && c === 5) || (r === 9 && c === 3)) {
+              if (!board[8][4] || board[8][4].side !== p.side) moves.push({r:8, c:4});
+              if (!board[8][4]) {
+                const tr = r === 7 ? 9 : 7, tc = c === 5 ? 3 : 5;
+                if (!board[tr][tc] || board[tr][tc].side !== p.side) moves.push({r:tr, c:tc});
+              }
+            }
+            break;
+          }
+          case 'H': { // 마 (멱 체크)
+            const mDirs = [
+              { step: [-1, 0], diag: [[-2, -1], [-2, 1]] },
+              { step: [1, 0],  diag: [[2, -1], [2, 1]] },
+              { step: [0, -1], diag: [[-1, -2], [1, -2]] },
+              { step: [0, 1],  diag: [[-1, 2], [1, 2]] }
+            ];
+            for (const d of mDirs) {
+              const br = r + d.step[0], bc = c + d.step[1];
+              if (br >= 0 && br < ROWS && bc >= 0 && bc < COLS && !board[br][bc]) {
+                for (const dg of d.diag) add(dg[0], dg[1]);
+              }
+            }
+            break;
+          }
+          case 'E': { // 상 (멱 2곳 체크)
+            const eDirs = [
+              { step: [-1, 0], d1: [-2, -1], end: [-3, -2] },
+              { step: [-1, 0], d1: [-2, 1],  end: [-3, 2] },
+              { step: [1, 0],  d1: [2, -1],  end: [3, -2] },
+              { step: [1, 0],  d1: [2, 1],   end: [3, 2] },
+              { step: [0, -1], d1: [-1, -2], end: [-2, -3] },
+              { step: [0, -1], d1: [1, -2],  end: [2, -3] },
+              { step: [0, 1],  d1: [-1, 2],  end: [-2, 3] },
+              { step: [0, 1],  d1: [1, 2],   end: [2, 3] }
+            ];
+            for (const d of eDirs) {
+              const b1r = r + d.step[0], b1c = c + d.step[1];
+              const b2r = r + d.d1[0], b2c = c + d.d1[1];
+              if (b1r >= 0 && b1r < ROWS && b1c >= 0 && b1c < COLS && !board[b1r][b1c]) {
+                if (b2r >= 0 && b2r < ROWS && b2c >= 0 && b2c < COLS && !board[b2r][b2c]) {
+                  add(r + d.end[0], c + d.end[1]);
+                }
+              }
+            }
+            break;
+          }
+          case 'C': { // 포 (포끼리 넘기 불가, 1개 건너뛰기)
+            const dirs = [[1,0], [-1,0], [0,1], [0,-1]];
+            for (const [dr, dc] of dirs) {
+              let nr = r + dr, nc = c + dc;
+              let jumped = false;
+              while (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                const mid = board[nr][nc];
+                if (!jumped) {
+                  if (mid) {
+                    if (mid.type === 'C') break;
+                    jumped = true;
+                  }
+                } else {
+                  if (!mid) {
+                    moves.push({ r: nr, c: nc });
+                  } else {
+                    if (mid.type !== 'C' && mid.side !== p.side) {
+                      moves.push({ r: nr, c: nc });
+                    }
+                    break;
+                  }
+                }
+                nr += dr; nc += dc;
+              }
+            }
+            break;
+          }
+          case 'K':
+          case 'A': { // 궁 및 사 (궁성 내부 이동)
+            const targetSide = p.side === 'HAN' ? 'HAN' : 'CHO';
+            const kDirs = [[1,0], [-1,0], [0,1], [0,-1]];
+            for (const [dr, dc] of kDirs) {
+              const nr = r + dr, nc = c + dc;
+              if (this.inPalace(nr, nc, targetSide)) add(nr, nc);
+            }
+            // 궁성 내부 대각 이동
+            const diagPoints = [
+              [0,3],[0,5],[1,4],[2,3],[2,5],
+              [7,3],[7,5],[8,4],[9,3],[9,5]
+            ];
+            const isDiag = diagPoints.some(pt => pt[0] === r && pt[1] === c);
+            if (isDiag) {
+              const cDirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+              for (const [dr, dc] of cDirs) {
+                const nr = r + dr, nc = c + dc;
+                if (this.inPalace(nr, nc, targetSide)) {
+                  if ((r === 1 && c === 4) || (r === 8 && c === 4) || (nr === 1 && nc === 4) || (nr === 8 && nc === 4)) {
+                    add(nr, nc);
+                  }
+                }
+              }
+            }
+            break;
+          }
+        }
+
+        return moves;
+      }
+
+      isKingInCheck(side, board) {
+        let kr = -1, kc = -1;
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const p = board[r][c];
+            if (p && p.side === side && p.type === 'K') {
+              kr = r; kc = c; break;
+            }
+          }
+          if (kr !== -1) break;
+        }
+        if (kr === -1) return false;
+
+        const enemySide = side === 'CHO' ? 'HAN' : 'CHO';
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            const ep = board[r][c];
+            if (ep && ep.side === enemySide) {
+              const moves = this.getMoves(r, c, board);
+              if (moves.some(m => m.r === kr && m.c === kc)) return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      saveState() {
+        const copy = this.board.map(row => row.map(cell => cell ? { ...cell } : null));
+        this.history.push({ board: copy, turn: this.turn });
+        if (this.history.length > 30) this.history.shift();
+      }
+
+      undo() {
+        if (this.history.length === 0) {
+          alert('더 이상 물릴 수 없습니다.');
+          return;
+        }
+        const last = this.history.pop();
+        this.board = last.board;
+        this.turn = last.turn;
+        this.selected = null;
+        this.validMoves = [];
+        this.updateUI();
+        this.gameMsg.innerText = "한 수를 물렸습니다.";
+      }
+
+      passTurn() {
+        if (this.isAiThinking) return;
+        this.turn = this.turn === 'CHO' ? 'HAN' : 'CHO';
+        this.selected = null;
+        this.validMoves = [];
+        this.updateUI();
+        this.checkPostMove();
+      }
+
+      toggleAudio() {
+        SOUND.enabled = !SOUND.enabled;
+        document.getElementById('audioBtn').innerText = `소리: ${SOUND.enabled ? '켬' : '끔'}`;
+      }
+
+      changeOpponent(mode) {
+        this.opponent = mode;
+        this.reset();
+      }
+    }
+
+    let game;
+    window.addEventListener('DOMContentLoaded', () => {
+      game = new JanggiGame();
+    });
+  </script>
+</body>
+</html>
